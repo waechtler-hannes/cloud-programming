@@ -1,0 +1,11 @@
+# Webpack / Node Dependencies
+node_modules/
+
+# Webpack Build Output
+dist/
+
+# Terraform-spezifische Dateien
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
