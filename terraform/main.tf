@@ -101,23 +101,3 @@ resource "aws_s3_bucket_policy" "allow_access_cloud_front" {
     ]
   })
 }
-
-# resource "aws_s3_object" "object" {
-#   for_each = fileset("${path.module}/website", "**/*")
-#   bucket   = aws_s3_bucket.cp.id
-#   key      = each.value
-#   source   = "${path.module}/website/${each.value}"
-#   etag     = filemd5("${path.module}/website/${each.value}")
-#   content_type = lookup(
-#     {
-#       "html" = "text/html",
-#       "css"  = "text/css",
-#       "js"   = "application/javascript",
-#       "json" = "application/json",
-#       "jpg"  = "image/jpeg",
-#       "jpeg" = "image/jpeg",
-#       "png"  = "image/png"
-#     },
-#     split(".", each.value)[length(split(".", each.value)) - 1], "application/octet-stream"
-#   )
-# }
