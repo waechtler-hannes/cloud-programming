@@ -1,0 +1,52 @@
+name: Deploy Website to S3 and Invalidate CloudFront
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'website/**'   # Läuft nur, wenn sich Frontend-Dateien ändern
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Code aus dem Repository auf die GitHub-Runner-VM laden
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Node.js-Umgebung für Webpack vorbereiten
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      # 3. Webpack-Abhängigkeiten installieren & Projekt bauen
+      - name: Install Dependencies & Build
+        working-directory: ./website
+        run: |
+          npm ci
+          npm run build
+
+      # 4. AWS-Zugangsdaten über die Secrets laden
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 5. Gebauten Ordner (dist) in den S3-Bucket synchronisieren
+      - name: Sync Website to S3
+        run: |
+          aws s3 sync ./website/dist s3://${{ secrets.S3_BUCKET_NAME }} --delete
+
+      # 6. CloudFront-Cache leeren (Create Invalidation)
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
