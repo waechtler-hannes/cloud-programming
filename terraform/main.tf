@@ -28,6 +28,52 @@ resource "aws_cloudfront_origin_access_control" "oac" {
   signing_protocol                  = "sigv4"
 }
 
+resource "aws_cloudfront_distribution" "s3_distribution" {
+  origin {
+    domain_name              = aws_s3_bucket.cp.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
+    origin_id                = local.origin_id
+  }
+
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "Cloudfront Distribution"
+  default_root_object = "index.html"
+
+  //aliases = ["mysite.${local.my_domain}", "yoursite.${local.my_domain}"]
+
+  default_cache_behavior {
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = local.origin_id
+
+    forwarded_values {
+      query_string = false
+
+      cookies {
+        forward = "none"
+      }
+    }
+
+    viewer_protocol_policy = "redirect-to-https"
+    min_ttl                = 0
+    default_ttl            = 3600
+    max_ttl                = 86400
+  }
+
+  price_class = var.price_class
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+}
+
 resource "aws_s3_bucket_policy" "allow_access_cloud_front" {
   bucket = aws_s3_bucket.cp.id
 
@@ -74,50 +120,4 @@ resource "aws_s3_object" "object" {
     },
     split(".", each.value)[length(split(".", each.value)) - 1], "application/octet-stream"
   )
-}
-
-resource "aws_cloudfront_distribution" "s3_distribution" {
-  origin {
-    domain_name              = aws_s3_bucket.cp.bucket_regional_domain_name
-    origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
-    origin_id                = local.origin_id
-  }
-
-  enabled             = true
-  is_ipv6_enabled     = true
-  comment             = "Cloudfront Distribution"
-  default_root_object = "index.html"
-
-  //aliases = ["mysite.${local.my_domain}", "yoursite.${local.my_domain}"]
-
-  default_cache_behavior {
-    allowed_methods  = ["GET", "HEAD"]
-    cached_methods   = ["GET", "HEAD"]
-    target_origin_id = local.origin_id
-
-    forwarded_values {
-      query_string = false
-
-      cookies {
-        forward = "none"
-      }
-    }
-
-    viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = 3600
-    max_ttl                = 86400
-  }
-
-  price_class = var.price_class
-
-  restrictions {
-    geo_restriction {
-      restriction_type = "none"
-    }
-  }
-
-  viewer_certificate {
-    cloudfront_default_certificate = true
-  }
 }

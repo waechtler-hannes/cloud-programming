@@ -1,7 +1,7 @@
 variable "bucket_name" {
     description = "S3-Bucket Name"
     type = string
-    default = "Website-Content-Storage"
+    default = "s3-bucket-cloud-programming"
 }
 
 variable "region" {
