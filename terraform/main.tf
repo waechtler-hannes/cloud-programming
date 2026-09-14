@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "cp" {
-  bucket = "s3-cloud-programming"
+  bucket = var.bucket_name
   force_destroy = true
 
   tags = {
