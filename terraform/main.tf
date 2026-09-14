@@ -4,6 +4,7 @@ provider "aws" {
 
 resource "aws_s3_bucket" "cp" {
   bucket = "s3-cloud-programming"
+  force_destroy = true
 
   tags = {
     Name        = var.bucket_name
