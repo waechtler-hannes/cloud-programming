@@ -23,28 +23,32 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 2. Bucket-Name aus lokaler TF-Datei lesen & CloudFront Distribution via AWS CLI auflösen
+      # 2. Bucket-Name aus variables.tf lesen & CloudFront Distribution via jq auflösen
       - name: Resolve Dynamic AWS Parameters
         run: |
-          # 1. Bucket-Name direkt aus variables.tf extrahieren
           BUCKET_NAME=$(grep -A 5 'variable "bucket_name"' terraform/variables.tf | grep 'default' | awk -F '"' '{print $2}')
           
           if [ -z "$BUCKET_NAME" ]; then
-            echo "Fehler: Konnte S3_BUCKET_NAME nicht aus terraform/variables.tf lesen!"
+            echo "Fehler: Konnte S3_BUCKET_NAME nicht aus variables.tf lesen!"
             exit 1
           fi
           echo "Extrahierter Bucket-Name: $BUCKET_NAME"
           echo "S3_BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
 
-          # 2. Zugehörige CloudFront Distribution dynamisch über den extrahierten Bucket-Namen finden
-          DIST_ID=$(aws cloudfront list-distributions \
-            --query "DistributionList.Items[?Origins.Items[?contains(DomainName, '$BUCKET_NAME')]].Id | [0]" \
-            --output text)
+          DIST_ID=$(aws cloudfront list-distributions --output json | jq -r \
+            --arg BUCKET "$BUCKET_NAME" \
+            '.DistributionList.Items[]? | select(.Origins.Items[]?.DomainName | contains($BUCKET)) | .Id' | head -n 1)
 
-          if [ "$DIST_ID" == "None" ] || [ -z "$DIST_ID" ]; then
-            echo "Fehler: Keine aktive Distribution für Bucket $BUCKET_NAME gefunden!"
+          if [ -z "$DIST_ID" ] || [ "$DIST_ID" == "null" ]; then
+            echo "Kein exakter Origin-Treffer für $BUCKET_NAME – wähle die erste Distribution im Account..."
+            DIST_ID=$(aws cloudfront list-distributions --output json | jq -r '.DistributionList.Items[0].Id // empty')
+          fi
+
+          if [ -z "$DIST_ID" ] || [ "$DIST_ID" == "null" ]; then
+            echo "Fehler: Es konnte überhaupt keine CloudFront-Distribution im AWS-Account gefunden werden!"
             exit 1
           fi
+
           echo "Gefundene Distribution-ID: $DIST_ID"
           echo "CLOUDFRONT_DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_ENV
 
