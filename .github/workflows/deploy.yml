@@ -1,37 +1,21 @@
-name: Deploy Website to S3 and Invalidate CloudFront
+name: Build and Deploy Website
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'website/**'   # Läuft nur, wenn sich Frontend-Dateien ändern
+      - 'website/**'
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Code aus dem Repository auf die GitHub-Runner-VM laden
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Node.js-Umgebung für Webpack vorbereiten
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: website/package-lock.json
-
-      # 3. Webpack-Abhängigkeiten installieren & Projekt bauen
-      - name: Install Dependencies & Build
-        working-directory: ./website
-        run: |
-          npm ci
-          npm run build
-
-      # 4. AWS-Zugangsdaten über die Secrets laden
+      # 1. AWS Credentials konfigurieren (nur Access Key, Secret Key, Region als Secret)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -39,14 +23,53 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 5. Gebauten Ordner (dist) in den S3-Bucket synchronisieren
+      # 2. Bucket-Name aus lokaler TF-Datei lesen & CloudFront Distribution via AWS CLI auflösen
+      - name: Resolve Dynamic AWS Parameters
+        run: |
+          # 1. Bucket-Name direkt aus variables.tf extrahieren
+          BUCKET_NAME=$(grep -A 5 'variable "bucket_name"' terraform/variables.tf | grep 'default' | awk -F '"' '{print $2}')
+          
+          if [ -z "$BUCKET_NAME" ]; then
+            echo "Fehler: Konnte S3_BUCKET_NAME nicht aus terraform/variables.tf lesen!"
+            exit 1
+          fi
+          echo "Extrahierter Bucket-Name: $BUCKET_NAME"
+          echo "S3_BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
+
+          # 2. Zugehörige CloudFront Distribution dynamisch über den extrahierten Bucket-Namen finden
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Origins.Items[?contains(DomainName, '$BUCKET_NAME')]].Id | [0]" \
+            --output text)
+
+          if [ "$DIST_ID" == "None" ] || [ -z "$DIST_ID" ]; then
+            echo "Fehler: Keine aktive Distribution für Bucket $BUCKET_NAME gefunden!"
+            exit 1
+          fi
+          echo "Gefundene Distribution-ID: $DIST_ID"
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_ENV
+
+      # 3. Webpack installieren und bauen
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install & Build Webpack
+        working-directory: ./website
+        run: |
+          npm ci
+          npm run build
+
+      # 4. Upload nach S3
       - name: Sync Website to S3
         run: |
-          aws s3 sync ./website/dist s3://${{ secrets.S3_BUCKET_NAME }} --delete
+          aws s3 sync ./website/dist s3://${{ env.S3_BUCKET_NAME }} --delete
 
-      # 6. CloudFront-Cache leeren (Create Invalidation)
+      # 5. Invalidation mit der dynamisch ermittelten ID
       - name: Invalidate CloudFront Cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
