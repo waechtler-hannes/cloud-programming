@@ -13,5 +13,5 @@ variable "region" {
 variable "price_class" {
     description = "CloudFront Distribution Price Class"
     type = string
-    default = "PriceClass_100"
+    default = "PriceClass_All"
 }
