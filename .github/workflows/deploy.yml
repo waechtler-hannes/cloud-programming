@@ -12,12 +12,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Run tfsec Security Scanner
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          working_directory: ../../terraform
-          soft_fail: true
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
