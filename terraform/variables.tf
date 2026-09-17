@@ -1,17 +1,11 @@
 variable "bucket_name" {
-    description = "S3-Bucket Name"
-    type = string
-    default = "s3-cloud-programming"
+  type = string
 }
 
 variable "region" {
-    description = "AWS Region"
-    type = string
-    default = "eu-central-1"
+  type = string
 }
 
 variable "price_class" {
-    description = "CloudFront Distribution Price Class"
-    type = string
-    default = "PriceClass_All"
+  type = string
 }

@@ -15,34 +15,57 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Read Configuration from terraform.tfvars.json
+        id: config
+        run: |
+          CONFIG_FILE="terraform/terraform.tfvars.json"
+
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "Fehler: Konfigurationsdatei $CONFIG_FILE nicht gefunden!"
+            exit 1
+          fi
+
+          AWS_REGION=$(jq -r .region "$CONFIG_FILE")
+          BUCKET_NAME=$(jq -r .bucket_name "$CONFIG_FILE")
+
+          if [ -z "$AWS_REGION" ] || [ "$AWS_REGION" == "null" ]; then
+            echo "Fehler: 'region' konnte nicht aus $CONFIG_FILE gelesen werden!"
+            exit 1
+          fi
+
+          if [ -z "$BUCKET_NAME" ] || [ "$BUCKET_NAME" == "null" ]; then
+            echo "Fehler: 'bucket_name' konnte nicht aus $CONFIG_FILE gelesen werden!"
+            exit 1
+          fi
+
+          echo "Gelesene Region: $AWS_REGION"
+          echo "Gelesener Bucket-Name: $BUCKET_NAME"
+
+          # Als Step-Output für den Login-Step bereitstellen
+          echo "aws_region=$AWS_REGION" >> "$GITHUB_OUTPUT"
+
+          # Als Umgebungsvariable für nachfolgende Steps (S3-Sync) bereitstellen
+          echo "S3_BUCKET_NAME=$BUCKET_NAME" >> "$GITHUB_ENV"
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ steps.config.outputs.aws_region }}
 
-      - name: Resolve Dynamic AWS Parameters
+      - name: Resolve CloudFront Distribution ID
         run: |
-          BUCKET_NAME=$(grep -A 5 'variable "bucket_name"' terraform/variables.tf | grep 'default' | awk -F '"' '{print $2}')
-          
-          if [ -z "$BUCKET_NAME" ]; then
-            echo "Fehler: Konnte S3_BUCKET_NAME nicht aus terraform/variables.tf lesen!"
-            exit 1
-          fi
-          echo "Extrahierter Bucket-Name: $BUCKET_NAME"
-          echo "S3_BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
-
           DIST_ID=$(aws cloudfront list-distributions \
-            --query "DistributionList.Items[?Origins.Items[?contains(DomainName, '$BUCKET_NAME')]].Id | [0]" \
+            --query "DistributionList.Items[?Origins.Items[?contains(DomainName, '$S3_BUCKET_NAME')]].Id | [0]" \
             --output text)
 
           if [ "$DIST_ID" == "None" ] || [ -z "$DIST_ID" ]; then
-            echo "Fehler: Keine aktive Distribution für Bucket $BUCKET_NAME gefunden!"
+            echo "Fehler: Keine aktive Distribution für Bucket $S3_BUCKET_NAME gefunden!"
             exit 1
           fi
           echo "Gefundene Distribution-ID: $DIST_ID"
-          echo "CLOUDFRONT_DISTRIBUTION_ID=$DIST_ID" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$DIST_ID" >> "$GITHUB_ENV"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
