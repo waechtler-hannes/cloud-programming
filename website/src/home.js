@@ -2,7 +2,7 @@ import "./styles.css";
 
 const headlineText = "Olive & Greens";
 
-const descriptionText = "Where the world of salads meets the distinctive variety of olives. From crisp leafy greens and Mediterranean compositions to creative bowls, we focus on fresh ingredients and the unique flavor that only high quality olives can provide. Discover your new favorite salad.";
+const descriptionText = "Where the world of salads meets the distinctive variety of olives. From crisp leafy greens and Mediterranean compositions to creative bowls, we focus on fresh ingredients and the unique flavor that only high-quality olives can provide. Discover your new favorite salad.";
 
 function loadPage() {
     const contentArea = document.querySelector("#content");
