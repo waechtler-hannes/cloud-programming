@@ -41,10 +41,8 @@ jobs:
           echo "Gelesene Region: $AWS_REGION"
           echo "Gelesener Bucket-Name: $BUCKET_NAME"
 
-          # Als Step-Output für den Login-Step bereitstellen
           echo "aws_region=$AWS_REGION" >> "$GITHUB_OUTPUT"
 
-          # Als Umgebungsvariable für nachfolgende Steps (S3-Sync) bereitstellen
           echo "S3_BUCKET_NAME=$BUCKET_NAME" >> "$GITHUB_ENV"
 
       - name: Configure AWS Credentials

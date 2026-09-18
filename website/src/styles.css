@@ -80,6 +80,7 @@ button:hover {
     left: 22%;
     font-size: max(18px, 1.2vw);
     max-width: 40%;
+    margin-bottom: 50px;
 }
 
 .container {
